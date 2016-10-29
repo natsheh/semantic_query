@@ -12,6 +12,6 @@
 # Author: Hussein AL-NATSHEH <h.natsheh@ciapple.com>
 # Affiliation: CIAPPLE, Jordan
 
-from .load import Articles
+from .load import Articles, Mapper
 
-__all__ = ("Articles")
+__all__ = ("Articles", "Mapper")

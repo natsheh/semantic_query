@@ -39,3 +39,18 @@ class Articles(object):
 	def print_stats(self):
 		print 'number of articles: ', self.articles_count
 		print 'number of docs: ', self.docs_count
+
+class Mapper():
+	def __init__(self, corpus):
+		self.corpus = corpus
+		self.articles = dict()
+		for sub in os.listdir(self.corpus):
+			subdir = os.path.join(self.corpus, sub)
+			for fname in os.listdir(subdir):
+				for i, line in enumerate(open(os.path.join(subdir, fname))):
+					if i == 0:
+						self.articles[fname[:-4]] = line
+						break
+
+	def get_title(self, article_id):
+		return self.articles[article_id]
