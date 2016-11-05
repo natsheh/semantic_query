@@ -7,7 +7,7 @@
 # under the terms of the Revised BSD License; see LICENSE file for
 # more details.
 
-# Main example
+# Parameters design and tuning
 
 # Author: Hussein AL-NATSHEH <h.natsheh@ciapple.com>
 # Affiliation: CIAPPLE, Jordan
