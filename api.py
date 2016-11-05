@@ -7,23 +7,27 @@
 # under the terms of the Revised BSD License; see LICENSE file for
 # more details.
 
-# Main example
+# Semantic Query API
 
 # Author: Hussein AL-NATSHEH <h.natsheh@ciapple.com>
 # Affiliation: CIAPPLE, Jordan
 
 import os, argparse, pickle, json
-from sklearn.pipeline import Pipeline
+import numpy as np
+
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.decomposition import TruncatedSVD, MiniBatchDictionaryLearning
 from sklearn.metrics.pairwise import cosine_similarity
-from utils import Mapper
+from sklearn.pipeline import Pipeline
+
 from collections import OrderedDict
-import numpy as np
 from itertools import islice
 from stop_words import get_stop_words
 from bs4 import BeautifulSoup
-import IPython
+
+from flask import Flask, make_response, make_response, request, current_app
+from flask_httpauth import HTTPBasicAuth
+from flask_restful import Resource, Api, reqparse
 
 def count_docs (m_corpus, w_corpus, paragraphs_per_article):
 	articles_count = 0
@@ -85,21 +89,6 @@ def load_corpus (m_corpus, w_corpus, docs_count, paragraphs_per_article):
 						break
 	return docs, index
 
-class Mapper():
-	def __init__(self, corpus):
-		self.corpus = corpus
-		self.documents = dict()
-		for sub in os.listdir(self.corpus):
-			subdir = os.path.join(self.corpus, sub)
-			for fname in os.listdir(subdir):
-				for i, line in enumerate(open(os.path.join(subdir, fname))):
-					if i == 0:
-						self.documents[fname[:-4]] = line
-						break
-
-	def get_title(self, article_id):
-		return self.documents[article_id]
-
 def top(n, sorted_results):
 	return list(islice(sorted_results.iteritems(), n))
 
@@ -115,13 +104,12 @@ def query_by_id(transformed, documents, index, query_id=2, n_results=10):
 	sorted_results = OrderedDict(sorted(results.items(), key=lambda k: k[1], reverse=True))
 	topn = top(n_results, sorted_results)
 
-	print 'the query document:', index[query_id]
-	print documents[query_id]
+	results = dict()
+	results[0] = {'query': documents[query_id], 'query_doc_id': index[query_id]}
+	for rank, (doc, score) in enumerate(topn):
+		results[rank+1] = {'score': str(score), 'doc_id':  str(index[doc]), 'document': documents[doc]}
 
-	for i, j in topn:
-		print 'score:', j, ' Document ID: ', index[i]
-		print documents[i]
-		print '-----------------------------------------------------------'
+	return results
 
 def query_by_text(transformer, transformed, decomposition_type, documents, index, query_text, n_results=10):
 	query_text = BeautifulSoup(query_text, "lxml").p.contents
@@ -138,58 +126,52 @@ def query_by_text(transformer, transformed, decomposition_type, documents, index
 	sorted_results = OrderedDict(sorted(results.items(), key=lambda k: k[1], reverse=True))
 	topn = top(n_results, sorted_results)
 
-	for i, j in topn:
-		print 'score:', j, ' Document ID: ', index[i]
-		print documents[i]
-		print '-----------------------------------------------------------'
+	results = dict()
+	results[0] = {'query': query_text[0]}
+	for rank, (doc, score) in enumerate(topn):
+		title = documents[doc].split('__')[0]
+		results[rank+1] = {'score': str(score), 'doc_id':  str(index[doc]), 'title': title, 'document': documents[doc]}
 
-if __name__ == "__main__" :
-	parser = argparse.ArgumentParser()
-	parser.add_argument("--m_corpus", default='../m_output_parser', type=str) # path to m corpus
-	parser.add_argument("--w_corpus", default='None', type=str) # path to w corpus
-	parser.add_argument("--paragraphs_per_article", default=5, type=int) # max number of paragraphs per article to load from w corpus
-	parser.add_argument("--vectorizer_type", default="tfidf", type=str) # possible values: "tfidf" and "count"
-	parser.add_argument("--decomposition_type", default="svd", type=str) # possible values: "svd", "mbdl" or "None"
-	parser.add_argument("--mx_ngram", default=3, type=int) # the upper bound of the ngram range
-	parser.add_argument("--mn_ngram", default=1, type=int) # the lower bound of the ngram range
-	parser.add_argument("--stop_words", default=1, type=int) # filtering out English stop-words
-	parser.add_argument("--min_count", default=20, type=int) # minimum frequency of the token to be included in the vocabulary
-	parser.add_argument("--max_df", default=0.97, type=float) # how much vocabulary percent to keep at max based on frequency
-	parser.add_argument("--vec_size", default=30, type=int) # the size of the vector in the semantics space
-	parser.add_argument("--query_text", default='query.txt', type=str) # query text 
-	parser.add_argument("--query_id", default=2, type=int) # doc_id to use as query
-	parser.add_argument("--n_results", default=10, type=int) # number of query results to return
-	parser.add_argument("--transformed_file", default=None, type=str) # load dumped transformed vectors (pickle file)
-	parser.add_argument("--docs_file", default='documents.pickle', type=str) # documents file
-	parser.add_argument("--index_file", default='index.pickle', type=str) # index file
-	parser.add_argument("--transformer_file", default='transformer.pickle', type=str) # transformer file
-	parser.add_argument("--debug", default=0, type=int) # IPython embed
-	args = parser.parse_args()
-	m_corpus = args.m_corpus
-	w_corpus = args.w_corpus
-	if w_corpus == 'None':
-		w_corpus = None
-	paragraphs_per_article = args.paragraphs_per_article
-	vectorizer_type = args.vectorizer_type
-	decomposition_type = args.decomposition_type
-	mx_ngram = args.mx_ngram
-	mn_ngram =  args.mn_ngram
-	stop_words = args.stop_words
-	if stop_words:
-		stop_words = get_stop_words('ar')
-	else:
-		stop_words = None
-	min_count = args.min_count
-	max_df = args.max_df
-	n_components = args.vec_size
-	query_text = args.query_text
-	query_id = args.query_id
-	n_results = args.n_results
-	transformed_file = args.transformed_file
-	docs_file = args.docs_file
-	index_file = args.index_file
-	transformer_file = args.transformer_file
-	debug = args.debug
+	return results
+
+class Query(Resource):
+	def get(self):
+		try:
+			q = request.args.get('q')
+			response = {}
+			if q is None:
+				response['results'] = query_by_id(transformed, documents, index, query_id=query_id, n_results=n_results)
+			else:
+				response['results'] =  query_by_text(transformer, transformed, decomposition_type, documents, index, q, n_results=10)
+			return response
+
+		except Exception as e:
+			return {'error': str(e)}
+
+app = Flask(__name__, static_url_path="")
+auth = HTTPBasicAuth()
+
+api = Api(app)
+api.add_resource(Query, '/Query/')
+
+if __name__ == '__main__':
+	m_corpus = '../m_output_parser'
+	w_corpus = None
+	paragraphs_per_article = 5
+	vectorizer_type = 'tfidf'
+	decomposition_type = 'svd'
+	mx_ngram = 3
+	mn_ngram =  1
+	stop_words = get_stop_words('ar')
+	min_count = 5
+	max_df = 0.98
+	n_components = 25
+	query_id = 2
+	n_results = 5
+	transformed_file = 'transformed.pickle'
+	docs_file = 'trigram_svd25_documents.pickle'
+	index_file = 'trigram_svd25_index.pickle'
+	transformer_file = 'trigram_svd25_transformer.pickle'
 
 	if transformed_file is None:
 
@@ -242,11 +224,5 @@ if __name__ == "__main__" :
 		documents = pickle.load(open(docs_file,'rb'))
 		print 'number of documents :', len(index)
 		transformer = pickle.load(open(transformer_file,'rb'))
-
-	if query_text is None:
-		query_by_id(transformed, documents, index, query_id=query_id, n_results=n_results)
-	else:
-		query_by_text(transformer, transformed, decomposition_type, documents, index, query_text, n_results=10)
-
-	if debug:
-		IPython.embed()
+	print 'Ready to call!!'
+	app.run(debug=True, threaded=True)
