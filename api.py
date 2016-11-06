@@ -58,6 +58,8 @@ class Query(Resource):
 			try:
 				size = request.args.get('size')
 				n_results = int(size)
+				if n_results > 100:
+					n_results = 100
 			except:
 				n_results = 10
 			response = {}
