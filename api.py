@@ -92,4 +92,4 @@ if __name__ == '__main__':
 	transformer = pickle.load(open(transformer_file,'rb'))
 
 	print 'Ready to call!!'
-	app.run(debug=True, threaded=True)
+	app.run(host='0.0.0.0', threaded=True)
