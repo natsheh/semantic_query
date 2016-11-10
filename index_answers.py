@@ -14,8 +14,8 @@
 
 import os, argparse, pickle, json
 from sklearn.pipeline import Pipeline
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.decomposition import TruncatedSVD
+from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
+from sklearn.decomposition import TruncatedSVD, MiniBatchDictionaryLearning
 import numpy as np
 from stop_words import get_stop_words
 import IPython
@@ -27,32 +27,38 @@ def count_docs (m_corpus, w_corpus, paragraphs_per_article):
 		subdir = os.path.join(m_corpus, sub)
 		for fname in os.listdir(subdir):
 			articles_count += 1
+			doc = ''
 			for i, line in enumerate(open(os.path.join(subdir, fname))):
-				if i == 0:
-					title = line
-					continue
-				elif i == 1:
-					doc = str(title)+'__'+str(line)
-				else:
-					doc = str(title)+'__'+doc+' '+str(line)
-				if len(doc) > 100:
+				if len(doc) >300:
 					doc = ''
 					docs_count += 1
-				else:
-					continue
-
+				if i == 0:
+					title = str(line)
+				if i == 1:
+					line1 = title + '__'+ str(line) 
+					doc = line1
+ 				if i > 1:
+ 					doc = line1+' '+str(line)
 	if w_corpus is not None:
 		for sub in os.listdir(w_corpus):
 			subdir = os.path.join(w_corpus, sub)
 			for fname in os.listdir(subdir):
-				paragraphs_count = 0
 				articles_count += 1
+				doc = ''
 				for i, line in enumerate(open(os.path.join(subdir, fname))):
+					if len(doc) >300:
+						doc = ''
+						docs_count += 1
 					if i == 0:
-						continue
-					docs_count += 1
+						title = str(line)
+					if i == 1:
+						line1 = title + '__'+ str(line) 
+						doc = line1
+						docs_count += 1
 					if i == paragraphs_per_article:
-						break
+							break
+					if i > 1:
+	 					doc = line1+' '+str(line)
 	return docs_count, articles_count
 
 def load_corpus (m_corpus, w_corpus, docs_count, paragraphs_per_article):
@@ -63,45 +69,48 @@ def load_corpus (m_corpus, w_corpus, docs_count, paragraphs_per_article):
 		subdir = os.path.join(m_corpus, sub)
 		for fname in os.listdir(subdir):
 			article_id = 'm'+'_'+str(fname[:-4])
+			doc = ''
 			for i, line in enumerate(open(os.path.join(subdir, fname))):
-				if i == 0:
-					title = line
-					continue
-				elif i == 1:
-					doc = str(title)+'__'+str(line)
-				else:
-					doc = str(title)+'__'+doc+' '+str(line)
-				if len(doc) > 100:
-					docs[doc_id] = doc
+				if len(doc) > 300:
+					docs[doc_id] = unicode(doc, 'utf8')
 					doc = ''
 					index[doc_id] = str(article_id)+'_'+str(i)
 					doc_id += 1
-				else:
-					continue
+				if i == 0:
+					title = str(line)
+				if i == 1:
+					line1 = title+'__'+str(line)
+					doc = line1
+				if i > 1:
+					doc = line1+' '+str(line)
 
 	if w_corpus is not None:
 		for sub in os.listdir(w_corpus):
 			subdir = os.path.join(w_corpus, sub)
 			for fname in os.listdir(subdir):
 				article_id = 'w'+'_'+str(fname[:-4])
-				paragraphs_count = 0
 				for i, line in enumerate(open(os.path.join(subdir, fname))):
+					if len(doc) > 300:
+						docs[doc_id] = unicode(doc, 'utf8')
+						doc = ''
+						index[doc_id] = str(article_id)+'_'+str(i)
+						doc_id += 1
 					if i == 0:
 						title = line
-						continue
-					docs[doc_id] = str(title)+'__'+str(line)
-					index[doc_id] = str(article_id)+'_'+str(paragraphs_count)
-					paragraphs_count += 1
-					doc_id += 1
+					if i == 1:
+						line1 = title+'__'+str(line)
+						doc = line1
 					if i == paragraphs_per_article:
 						break
+					if i > 1:
+						doc = line1+' '+str(line)
 	return docs, index
 
 if __name__ == "__main__" :
 	parser = argparse.ArgumentParser()
 	parser.add_argument("--m_corpus", default='../m_output_parser', type=str) # path to m corpus
 	parser.add_argument("--w_corpus", default='None', type=str) # path to w corpus
-	parser.add_argument("--paragraphs_per_article", default=5, type=int) # max number of paragraphs per article to load from w corpus
+	parser.add_argument("--paragraphs_per_article", default=4, type=int) # max number of paragraphs per article to load from w corpus
 	parser.add_argument("--vectorizer_type", default="tfidf", type=str) # possible values: "tfidf" and "count"
 	parser.add_argument("--decomposition_type", default="svd", type=str) # possible values: "svd", "mbdl" or "None"
 	parser.add_argument("--mx_ngram", default=2, type=int) # the upper bound of the ngram range
@@ -109,7 +118,7 @@ if __name__ == "__main__" :
 	parser.add_argument("--stop_words", default=1, type=int) # filtering out English stop-words
 	parser.add_argument("--min_count", default=5, type=int) # minimum frequency of the token to be included in the vocabulary
 	parser.add_argument("--max_df", default=0.98, type=float) # how much vocabulary percent to keep at max based on frequency
-	parser.add_argument("--vec_size", default=30, type=int) # the size of the vector in the semantics space
+	parser.add_argument("--vec_size", default=350, type=int) # the size of the vector in the semantics space
 	parser.add_argument("--transformed_file", default='transformed.pickle', type=str) # load dumped transformed vectors (pickle file)
 	parser.add_argument("--docs_file", default='documents.pickle', type=str) # documents file
 	parser.add_argument("--index_file", default='index.pickle', type=str) # index file
@@ -149,9 +158,9 @@ if __name__ == "__main__" :
 			         analyzer='word', stop_words=stop_words, min_df=min_count, 
 			         ngram_range=(mn_ngram, mx_ngram), max_df=max_df)
 	elif vectorizer_type == "tfidf":
-		vectorizer = TfidfVectorizer(input='content',
+		vectorizer = TfidfVectorizer(input='content', decode_error='ignore',
 			         analyzer='word', stop_words=stop_words, min_df=min_count, 
-			         ngram_range=(mn_ngram, mx_ngram), max_df=max_df)
+			         ngram_range=(mn_ngram, mx_ngram), max_df=max_df, lowercase=False)
 	else:
 		raise NameError('Please check your vectorizer option. It must be either "tfidf" or "count"')
 
