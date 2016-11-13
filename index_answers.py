@@ -20,7 +20,7 @@ import numpy as np
 from stop_words import get_stop_words
 import IPython
 
-def count_docs (m_corpus, w_corpus, paragraphs_per_article):
+def count_docs (m_corpus, w_corpus, paragraphs_per_article, threshold=500):
 	articles_count = 0
 	docs_count = 0
 	for sub in os.listdir(m_corpus):
@@ -29,16 +29,14 @@ def count_docs (m_corpus, w_corpus, paragraphs_per_article):
 			articles_count += 1
 			doc = ''
 			for i, line in enumerate(open(os.path.join(subdir, fname))):
-				if len(doc) >300:
+				if len(doc) > threshold:
 					doc = ''
 					docs_count += 1
 				if i == 0:
 					title = str(line)
-				if i == 1:
-					line1 = title + '__'+ str(line) 
-					doc = line1
- 				if i > 1:
- 					doc = line1+' '+str(line)
+				if i > 0:
+					doc = str(line) + 'لمعرفة المزيد يرجى الإستماع أو قراءة كافة المقال بعنوان__' + title
+
 	if w_corpus is not None:
 		for sub in os.listdir(w_corpus):
 			subdir = os.path.join(w_corpus, sub)
@@ -46,22 +44,20 @@ def count_docs (m_corpus, w_corpus, paragraphs_per_article):
 				articles_count += 1
 				doc = ''
 				for i, line in enumerate(open(os.path.join(subdir, fname))):
-					if len(doc) >300:
+					if len(doc) > threshold:
 						doc = ''
 						docs_count += 1
 					if i == 0:
 						title = str(line)
-					if i == 1:
-						line1 = title + '__'+ str(line) 
-						doc = line1
-						docs_count += 1
+					if i > 0:
+						doc = str(line) + 'لمعرفة المزيد يرجى الإستماع أو قراءة كافة المقال بعنوان__' + title
 					if i == paragraphs_per_article:
 							break
 					if i > 1:
 	 					doc = line1+' '+str(line)
 	return docs_count, articles_count
 
-def load_corpus (m_corpus, w_corpus, docs_count, paragraphs_per_article):
+def load_corpus (m_corpus, w_corpus, docs_count, paragraphs_per_article, threshold=500):
 	docs = np.array(range(docs_count), dtype=np.object)
 	doc_id = 0
 	index = dict()
@@ -71,18 +67,15 @@ def load_corpus (m_corpus, w_corpus, docs_count, paragraphs_per_article):
 			article_id = 'm'+'_'+str(fname[:-4])
 			doc = ''
 			for i, line in enumerate(open(os.path.join(subdir, fname))):
-				if len(doc) > 300:
+				if len(doc) > threshold:
 					docs[doc_id] = unicode(doc, 'utf8')
 					doc = ''
 					index[doc_id] = str(article_id)+'_'+str(i)
 					doc_id += 1
 				if i == 0:
 					title = str(line)
-				if i == 1:
-					line1 = title+'__'+str(line)
-					doc = line1
-				if i > 1:
-					doc = line1+' '+str(line)
+				if i > 0:
+					doc = str(line) + 'لمعرفة المزيد يرجى الإستماع أو قراءة كافة المقال بعنوان__' + title
 
 	if w_corpus is not None:
 		for sub in os.listdir(w_corpus):
@@ -90,25 +83,22 @@ def load_corpus (m_corpus, w_corpus, docs_count, paragraphs_per_article):
 			for fname in os.listdir(subdir):
 				article_id = 'w'+'_'+str(fname[:-4])
 				for i, line in enumerate(open(os.path.join(subdir, fname))):
-					if len(doc) > 300:
+					if len(doc) > threshold:
 						docs[doc_id] = unicode(doc, 'utf8')
 						doc = ''
 						index[doc_id] = str(article_id)+'_'+str(i)
 						doc_id += 1
 					if i == 0:
-						title = line
-					if i == 1:
-						line1 = title+'__'+str(line)
-						doc = line1
+						title = str(line)
 					if i == paragraphs_per_article:
 						break
-					if i > 1:
-						doc = line1+' '+str(line)
+					if i > 0:
+						doc = str(line) + 'لمعرفة المزيد يرجى الإستماع أو قراءة كافة المقال بعنوان__' + title
 	return docs, index
 
 if __name__ == "__main__" :
 	parser = argparse.ArgumentParser()
-	parser.add_argument("--m_corpus", default='../m_output_parser', type=str) # path to m corpus
+	parser.add_argument("--m_corpus", default='../new_output_parser', type=str) # path to m corpus
 	parser.add_argument("--w_corpus", default='None', type=str) # path to w corpus
 	parser.add_argument("--paragraphs_per_article", default=4, type=int) # max number of paragraphs per article to load from w corpus
 	parser.add_argument("--vectorizer_type", default="tfidf", type=str) # possible values: "tfidf" and "count"
@@ -118,7 +108,7 @@ if __name__ == "__main__" :
 	parser.add_argument("--stop_words", default=1, type=int) # filtering out English stop-words
 	parser.add_argument("--min_count", default=5, type=int) # minimum frequency of the token to be included in the vocabulary
 	parser.add_argument("--max_df", default=0.98, type=float) # how much vocabulary percent to keep at max based on frequency
-	parser.add_argument("--vec_size", default=350, type=int) # the size of the vector in the semantics space
+	parser.add_argument("--vec_size", default=300, type=int) # the size of the vector in the semantics space
 	parser.add_argument("--transformed_file", default='transformed.pickle', type=str) # load dumped transformed vectors (pickle file)
 	parser.add_argument("--docs_file", default='documents.pickle', type=str) # documents file
 	parser.add_argument("--index_file", default='index.pickle', type=str) # index file

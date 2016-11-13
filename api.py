@@ -43,7 +43,8 @@ def query_by_text(transformer, transformed, documents, index, query_text, url, n
 
 	results = np.array(range(n_results), dtype=np.object)
 	for rank, (answer, score) in enumerate(topn):
-		title = documents[answer].split('\n__')[0]
+		title = documents[answer].split('__')[-1]
+		title = title.split('\n')[0]
 		title_t = title.replace (" ", "_")
 		doc_id = str(index[answer])
 		reference = url + title_t
